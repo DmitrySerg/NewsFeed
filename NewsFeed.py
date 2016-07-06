@@ -14,6 +14,9 @@ from bs4 import BeautifulSoup
 from tkinter import *
 import time
 from dateutil import parser
+import pandas as pd
+
+data = pd.DataFrame(columns=['name', 'url', 'date', 'date_tmstp', 'logo_url'])
 
 class site:
     def __init__(self, url):
@@ -45,8 +48,9 @@ class ItSobytie(site):
         self.end_url = end_url
         
     def site_parser(self):
+        global data
         soup = site.raw_parser(self.url+self.end_url)
-        self.events = {}
+        events = {}
         
         #### берём все предстоящие события
         total = soup.findAll('ul', attrs = {'class':'event_list'})[0]
@@ -64,21 +68,20 @@ class ItSobytie(site):
             date_tmstp = site.date_convert(date)
             
             # ссылка
-            url = re.split('href="|">',str(total.findAll('a', attrs = {'class':'summary'})[i]))
-            url = self.url+url[1]
+            event_url = re.split('href="|">',str(total.findAll('a', attrs = {'class':'summary'})[i]))
+            event_url = self.url+event_url[1]
             
             # картинка
             logo_url = re.split('src="|"/>', str(total.findAll('div', attrs={'class':'event_img'})[i]))
             logo_url = self.url+logo_url[1]
             
-            self.events[name] = [url, date, date_tmstp, logo_url]
-            
-            '''НАДО ПЕРЕДЕЛАТЬ НА ДАТАФРЕЙМ'''
-            
-        return self.events
+            events = {'name':name, 'url':event_url, 'date':date, 
+                           'date_tmstp':date_tmstp, 'logo_url':logo_url}
+            data = data.append(events, ignore_index = True)
 
+'''Создаём экземпляр класса и вызываем парсер'''
 ItSobytie_events = ItSobytie()
-ItSobytie_events = ItSobytie_events.site_parser() 
+ItSobytie_events.site_parser() 
 
 
 ################################
@@ -112,21 +115,23 @@ class App(tk.Tk):
 
     
     def update(self):
- 
+        global data
         ItSobytie_new_events = ItSobytie()
-        ItSobytie_new_events = ItSobytie_new_events.parser()
+        ItSobytie_new_events.site_parser()
         
         # для отладки создаем кучу новых имён
-        ItSobytie_new_events[str(time.time())] = ["wow", "lol", "kek"]
+        events = {'name':time.time(), 'url':'url', 'date':'date', 
+                  'date_tmstp':'date_tmstp', 'logo_url':'logo_url'}
+        data = data.append(events, ignore_index = True)
         
-        ItSobytie_events.update(ItSobytie_new_events)
-#        if len(ItSobytie_events.keys()) > 5:
             
-        
-        for name in ItSobytie_events:
-            if name not in self.mylist.get(0, 10000):
+        for row in range(len(data)):
+            '''проверяем, есть ли такое имя в списке, вносим, если нет'''
+            if data.loc[row, 'name'] not in self.mylist.get(0, 10000):
                 self.mylist.insert(END, "")
-                self.mylist.insert(END, name, ItSobytie_events[name][0], ItSobytie_events[name][1])
+                self.mylist.insert(END, data.loc[row, 'name'], 
+                                        data.loc[row, 'date'],
+                                        data.loc[row, 'url'])
                 self.mylist.pack( side = LEFT, fill = BOTH )
                 self.scrollbar.config( command = self.mylist.yview )
             
